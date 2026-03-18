@@ -29,6 +29,11 @@ public class QueryRequestDTO {
     @NotBlank(message = "question cannot be blank")
     private String question;
 
+    @Schema(description = "Query mode", example = "KB", allowableValues = {"KB", "CHAT"})
+    @Pattern(regexp = "KB|CHAT", message = "mode must be KB or CHAT")
+    @Builder.Default
+    private String mode = "KB";
+
     @Schema(description = "Top K retrieval size", example = "5")
     @Min(value = 1, message = "topK must be >= 1")
     @Max(value = 20, message = "topK must be <= 20")

@@ -82,7 +82,7 @@ public class KnowledgeBaseController {
     }
 
     @PostMapping("/query")
-    @Operation(summary = "知识库问答")
+    @Operation(summary = "统一问答入口（知识库问答 / 普通聊天）")
     public Result<QueryResponseVO> query(@Valid @RequestBody QueryRequestDTO request) {
         return Result.success(queryService.query(request));
     }

@@ -37,6 +37,8 @@ public class KnowledgeQueryServiceImpl implements KnowledgeQueryService {
 
     private static final double LOW_CONFIDENCE_SCORE_THRESHOLD = 0.35D;
     private static final List<String> ENTITY_QUESTION_MARKERS = List.of("是谁", "什么", "哪位", "哪个");
+    private static final List<String> QUERY_NOISE_MARKERS = List.of(
+            "这个文档里", "这个文档", "文档里", "知识库里", "知识库", "都有哪些", "有哪些", "有什么", "有哪", "请问");
     private static final String LOW_CONFIDENCE_ANSWER = "未找到足够可信的知识片段，请核对文档后重试。以下引用仅供人工核对。";
     private static final String DEGRADED_ANSWER = "模型服务暂时不可用，未生成最终答案；以下引用片段仅供人工核对。";
 
@@ -51,9 +53,19 @@ public class KnowledgeQueryServiceImpl implements KnowledgeQueryService {
     public QueryResponseVO query(QueryRequestDTO requestDTO) {
         long start = System.currentTimeMillis();
         String traceId = TraceIdUtil.newTraceId();
-        Map<String, String> metadataFilters = normalizeMetadataFilters(requestDTO.getMetadataFilters());
-        String cacheKey = buildCacheKey(requestDTO.getKbId(), requestDTO.getQuestion(), requestDTO.getTopK(), metadataFilters);
+        String mode = normalizeMode(requestDTO.getMode());
 
+        if (isChatMode(mode)) {
+            return QueryResponseVO.builder()
+                    .answer(llmService.generateGeneralAnswer(requestDTO.getQuestion()))
+                    .citations(List.of())
+                    .latencyMs(System.currentTimeMillis() - start)
+                    .traceId(traceId)
+                    .build();
+        }
+
+        Map<String, String> metadataFilters = normalizeMetadataFilters(requestDTO.getMetadataFilters());
+        String cacheKey = buildCacheKey(requestDTO.getKbId(), requestDTO.getQuestion(), mode, requestDTO.getTopK(), metadataFilters);
         QueryResponseVO cached = queryFromCache(cacheKey);
         if (cached != null) {
             cached.setTraceId(traceId);
@@ -168,10 +180,13 @@ public class KnowledgeQueryServiceImpl implements KnowledgeQueryService {
         }
 
         String stripped = normalizedQuestion;
+        for (String marker : QUERY_NOISE_MARKERS) {
+            stripped = stripped.replace(marker, " ");
+        }
         for (String marker : ENTITY_QUESTION_MARKERS) {
             stripped = stripped.replace(marker, " ");
         }
-        for (String stopWord : List.of("是", "的", "了", "吗", "呢")) {
+        for (String stopWord : List.of("是", "的", "了", "吗", "呢", "里", "都")) {
             stripped = stripped.replace(stopWord, " ");
         }
 
@@ -204,7 +219,7 @@ public class KnowledgeQueryServiceImpl implements KnowledgeQueryService {
         }
         return chunks.stream()
                 .map(chunk -> CitationVO.builder()
-                        .docId(String.valueOf(chunk.getDocId()))
+                        .docId(resolveCitationDocId(chunk))
                         .chunkId(chunk.getChunkId())
                         .fileName(chunk.getFileName())
                         .score(chunk.getScore())
@@ -213,24 +228,52 @@ public class KnowledgeQueryServiceImpl implements KnowledgeQueryService {
                 .toList();
     }
 
+    private String resolveCitationDocId(RetrievedChunk chunk) {
+        if (chunk == null) {
+            return null;
+        }
+        String chunkId = StrUtil.trim(chunk.getChunkId());
+        if (StrUtil.isNotBlank(chunkId)) {
+            int separatorIndex = chunkId.indexOf('-');
+            if (separatorIndex > 0) {
+                String docIdFromChunkId = chunkId.substring(0, separatorIndex).trim();
+                if (StrUtil.isNotBlank(docIdFromChunkId)) {
+                    return docIdFromChunkId;
+                }
+            }
+        }
+        return chunk.getDocId() == null ? null : String.valueOf(chunk.getDocId());
+    }
+
     static String buildCacheKey(QueryRequestDTO requestDTO) {
         return buildCacheKey(
                 requestDTO.getKbId(),
                 requestDTO.getQuestion(),
+                normalizeMode(requestDTO.getMode()),
                 requestDTO.getTopK(),
                 normalizeMetadataFilters(requestDTO.getMetadataFilters()));
     }
 
-    private static String buildCacheKey(String kbId, String question, Integer topK, Map<String, String> metadataFilters) {
+    private static String buildCacheKey(String kbId, String question, String mode, Integer topK, Map<String, String> metadataFilters) {
         TreeMap<String, String> normalizedFilters = new TreeMap<>(metadataFilters);
         String fingerprint = kbId
                 + "|"
                 + question
                 + "|"
+                + mode
+                + "|"
                 + topK
                 + "|"
                 + normalizedFilters;
         return "kb:query:" + DigestUtils.md5DigestAsHex(fingerprint.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static String normalizeMode(String mode) {
+        return isChatMode(mode) ? "CHAT" : "KB";
+    }
+
+    private static boolean isChatMode(String mode) {
+        return "CHAT".equalsIgnoreCase(StrUtil.blankToDefault(mode, "KB"));
     }
 
     private static Map<String, String> normalizeMetadataFilters(Map<String, String> metadataFilters) {

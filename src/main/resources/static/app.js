@@ -40,6 +40,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     bindEvents();
     initializeSectionView();
     syncKbId(refs.uploadKbId.value.trim(), refs.uploadKbId);
+    syncQueryModeUI();
 
     try {
         await loadRuntimeOverview(true);
@@ -85,9 +86,14 @@ function cacheElements() {
     refs.uploadResult = document.getElementById("upload-result");
 
     refs.queryForm = document.getElementById("query-form");
+    refs.queryModeInputs = Array.from(document.querySelectorAll('input[name="queryMode"]'));
+    refs.queryModeHint = document.getElementById("query-mode-hint");
+    refs.querySectionNote = document.getElementById("query-section-note");
     refs.queryKbId = document.getElementById("query-kb-id");
     refs.queryQuestion = document.getElementById("query-question");
+    refs.queryTopKField = document.getElementById("query-top-k-field");
     refs.queryTopK = document.getElementById("query-top-k");
+    refs.queryDocIdField = document.getElementById("query-doc-id-field");
     refs.queryDocId = document.getElementById("query-doc-id");
     refs.querySubmit = document.getElementById("query-submit");
     refs.queryResult = document.getElementById("query-result");
@@ -113,6 +119,9 @@ function bindEvents() {
     refs.runtimeRefresh.addEventListener("click", () => loadRuntimeOverview().catch(handlePageError));
     refs.uploadForm.addEventListener("submit", handleUpload);
     refs.queryForm.addEventListener("submit", handleQuery);
+    refs.queryModeInputs.forEach((input) => {
+        input.addEventListener("change", syncQueryModeUI);
+    });
     refs.filterForm.addEventListener("submit", handleFilterSubmit);
     refs.filterRefresh.addEventListener("click", () => loadDocuments().catch(handlePageError));
     refs.prevPage.addEventListener("click", () => {
@@ -307,6 +316,31 @@ function syncKbId(value, sourceInput) {
             input.value = kbId;
         }
     });
+}
+
+function getSelectedQueryMode() {
+    const selectedInput = refs.queryModeInputs.find((input) => input.checked);
+    return selectedInput ? selectedInput.value : "KB";
+}
+
+function syncQueryModeUI() {
+    const mode = getSelectedQueryMode();
+    const isChatMode = mode === "CHAT";
+
+    refs.queryTopK.disabled = isChatMode;
+    refs.queryDocId.disabled = isChatMode;
+    refs.queryTopKField.classList.toggle("field-disabled", isChatMode);
+    refs.queryDocIdField.classList.toggle("field-disabled", isChatMode);
+
+    if (isChatMode) {
+        refs.querySectionNote.textContent = "当前为普通聊天，不会使用 embedding 或向量检索。";
+        refs.queryModeHint.textContent = "普通聊天会直接调用大模型，页面只展示最终回答结果；Top K 与限定文档 ID 会被忽略。";
+        refs.queryDocId.value = "";
+        return;
+    }
+
+    refs.querySectionNote.textContent = "当前为知识库问答，可选按文档 ID 过滤，便于收敛回答范围。";
+    refs.queryModeHint.textContent = "知识库问答会走检索增强流程，页面只展示最终回答结果。";
 }
 
 function setButtonBusy(button, isBusy, busyText) {
@@ -528,19 +562,23 @@ async function handleUpload(event) {
 async function handleQuery(event) {
     event.preventDefault();
 
+    const mode = getSelectedQueryMode();
     const payload = {
         kbId: refs.queryKbId.value.trim(),
         question: refs.queryQuestion.value.trim(),
+        mode,
         topK: Number(refs.queryTopK.value) || 5,
         metadataFilters: {}
     };
 
-    if (refs.queryDocId.value.trim()) {
+    if (mode === "KB" && refs.queryDocId.value.trim()) {
         payload.metadataFilters.docId = refs.queryDocId.value.trim();
     }
 
     setButtonBusy(refs.querySubmit, true, "查询中");
-    refs.queryResult.innerHTML = "<p>正在检索知识片段并生成回答...</p>";
+    refs.queryResult.innerHTML = mode === "CHAT"
+        ? "<p>正在调用普通聊天能力生成回答...</p>"
+        : "<p>正在检索知识片段并生成回答...</p>";
 
     try {
         const result = await request("/query", {
@@ -551,42 +589,7 @@ async function handleQuery(event) {
             body: JSON.stringify(payload)
         });
 
-        const citations = result.citations && result.citations.length > 0
-            ? result.citations.map((item) => `
-                <article class="citation-card">
-                    <h4>${escapeHtml(item.fileName || "未知文件")}</h4>
-                    <p>${escapeHtml(item.snippet || "无片段")}</p>
-                    <div class="citation-meta">
-                        <span>文档 ID: ${escapeHtml(item.docId)}</span>
-                        <span>Chunk: ${escapeHtml(item.chunkId || "—")}</span>
-                        <span>Score: ${escapeHtml(item.score ?? "—")}</span>
-                    </div>
-                </article>
-            `).join("")
-            : "<p>本次问答没有返回引用片段。</p>";
-
-        refs.queryResult.innerHTML = `
-            <div class="answer-title">
-                <h3>回答结果</h3>
-                <span>${escapeHtml(result.latencyMs)} ms</span>
-            </div>
-            <div class="answer-copy">${escapeHtml(result.answer)}</div>
-            <div class="meta-grid">
-                <div class="meta-item">
-                    <span>Trace ID</span>
-                    <strong>${escapeHtml(result.traceId)}</strong>
-                </div>
-                <div class="meta-item">
-                    <span>引用数量</span>
-                    <strong>${escapeHtml(result.citations ? result.citations.length : 0)}</strong>
-                </div>
-                <div class="meta-item">
-                    <span>结果概览</span>
-                    <strong>${result.citations && result.citations.length > 0 ? "已返回可核对引用" : "仅回答，无引用片段"}</strong>
-                </div>
-            </div>
-            <div class="citation-list">${citations}</div>
-        `;
+        refs.queryResult.innerHTML = `<div class="answer-copy">${escapeHtml(result.answer)}</div>`;
         showMessage("success", "问答请求已完成。");
     } catch (error) {
         refs.queryResult.innerHTML = `<p>${escapeHtml(error.message)}</p>`;

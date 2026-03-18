@@ -724,6 +724,49 @@ code {
     font-size: 0.9rem;
 }
 
+.mode-switch-fieldset {
+    margin: 0;
+    padding: 0;
+    border: none;
+}
+
+.mode-switch-fieldset legend {
+    padding: 0;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: var(--text-strong);
+}
+
+.mode-switch {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.mode-switch-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 48px;
+    padding: 0 16px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.84);
+    cursor: pointer;
+}
+
+.mode-switch-option input {
+    width: auto;
+    min-height: auto;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+}
+
+.field-disabled {
+    opacity: 0.58;
+}
+
 .form-foot {
     display: flex;
     align-items: center;

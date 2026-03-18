@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -79,6 +80,65 @@ class KnowledgeQueryServiceImplTest {
 
         assertThat(response.getAnswer()).contains("RAG");
         assertThat(response.getCitations()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("query should route chat mode to general chat without retrieval or cache")
+    void query_shouldRouteChatModeToGeneralChatWithoutRetrievalOrCache() {
+        EmbeddingService embeddingService = mock(EmbeddingService.class);
+        VectorStoreService vectorStoreService = mock(VectorStoreService.class);
+        LlmService llmService = mock(LlmService.class);
+        StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
+        @SuppressWarnings("unchecked")
+        ValueOperations<String, String> valueOperations = mock(ValueOperations.class);
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(llmService.generateGeneralAnswer("hello")).thenReturn("chat-answer");
+
+        KnowledgeQueryService knowledgeQueryService = buildService(
+                embeddingService,
+                vectorStoreService,
+                llmService,
+                providerOf(redisTemplate));
+
+        QueryResponseVO response = knowledgeQueryService.query(QueryRequestDTO.builder()
+                .kbId("default-kb")
+                .question("hello")
+                .mode("CHAT")
+                .topK(5)
+                .metadataFilters(Map.of("docId", "123"))
+                .build());
+
+        assertThat(response.getAnswer()).isEqualTo("chat-answer");
+        assertThat(response.getCitations()).isEmpty();
+        verify(llmService).generateGeneralAnswer("hello");
+        verifyNoInteractions(embeddingService, vectorStoreService);
+        verify(redisTemplate, never()).opsForValue();
+    }
+
+    @Test
+    @DisplayName("query should default missing mode to kb")
+    void query_shouldDefaultMissingModeToKb() {
+        EmbeddingService embeddingService = mock(EmbeddingService.class);
+        VectorStoreService vectorStoreService = mock(VectorStoreService.class);
+        LlmService llmService = mock(LlmService.class);
+        when(embeddingService.embed("What is RAG")).thenReturn(List.of(0.1F, 0.2F));
+        when(vectorStoreService.search(eq("default-kb"), anyList(), eq(5), eq(Map.of())))
+                .thenReturn(List.of(sampleChunk("RAG combines retrieval and generation")));
+        when(llmService.generateAnswer(eq("What is RAG"), anyList())).thenReturn("RAG combines retrieval and generation");
+
+        KnowledgeQueryService knowledgeQueryService = buildService(embeddingService, vectorStoreService, llmService);
+
+        QueryResponseVO response = knowledgeQueryService.query(QueryRequestDTO.builder()
+                .kbId("default-kb")
+                .question("What is RAG")
+                .topK(5)
+                .metadataFilters(Map.of())
+                .build());
+
+        assertThat(response.getAnswer()).contains("RAG");
+        verify(embeddingService).embed("What is RAG");
+        verify(vectorStoreService).search(eq("default-kb"), anyList(), eq(5), eq(Map.of()));
+        verify(llmService).generateAnswer(eq("What is RAG"), anyList());
     }
 
     @Test
@@ -281,6 +341,61 @@ class KnowledgeQueryServiceImplTest {
         assertThat(contextCaptor.getValue()).isNotEmpty();
         assertThat(contextCaptor.getValue().get(0).getContent()).contains("前端工程师是张三");
         assertThat(response.getAnswer()).contains("张三");
+    }
+
+    @Test
+    @DisplayName("query should allow chinese category question with literal match even when score is low")
+    void query_shouldAllowChineseCategoryQuestionWithLiteralMatchEvenWhenScoreIsLow() {
+        EmbeddingService embeddingService = new FixedEmbeddingService();
+        RetrievedChunk chunk = sampleChunk("P1001|无线蓝牙耳机|数码产品|199.9", 0.33D, 1L, "商品.txt");
+        VectorStoreService vectorStoreService = new FixedVectorStoreService(List.of(chunk));
+        LlmService llmService = mock(LlmService.class);
+        when(llmService.generateAnswer(anyString(), anyList())).thenReturn("数码产品包括无线蓝牙耳机");
+
+        KnowledgeQueryService knowledgeQueryService = buildService(embeddingService, vectorStoreService, llmService);
+
+        QueryResponseVO response = knowledgeQueryService.query(QueryRequestDTO.builder()
+                .kbId("default-kb")
+                .question("知识库里有哪些数码产品？")
+                .topK(5)
+                .metadataFilters(Map.of())
+                .build());
+
+        verify(llmService).generateAnswer(eq("知识库里有哪些数码产品？"), anyList());
+        verify(llmService, never()).generateGeneralAnswer(anyString());
+        assertThat(response.getAnswer()).contains("数码产品包括无线蓝牙耳机");
+        assertThat(response.getCitations()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("query should restore citation docId from chunkId when vector store docId is imprecise")
+    void query_shouldRestoreCitationDocIdFromChunkIdWhenVectorStoreDocIdIsImprecise() {
+        EmbeddingService embeddingService = new FixedEmbeddingService();
+        RetrievedChunk chunk = RetrievedChunk.builder()
+                .id(1L)
+                .kbId("default-kb")
+                .docId(2034259503927951400L)
+                .chunkId("2034259503927951361-0")
+                .fileName("商品.txt")
+                .content("P1001|无线蓝牙耳机|数码产品|199.9")
+                .score(0.9D)
+                .build();
+        VectorStoreService vectorStoreService = new FixedVectorStoreService(List.of(chunk));
+        LlmService llmService = mock(LlmService.class);
+        when(llmService.generateAnswer(anyString(), anyList())).thenReturn("数码产品包括无线蓝牙耳机");
+
+        KnowledgeQueryService knowledgeQueryService = buildService(embeddingService, vectorStoreService, llmService);
+
+        QueryResponseVO response = knowledgeQueryService.query(QueryRequestDTO.builder()
+                .kbId("default-kb")
+                .question("数码产品有哪些")
+                .topK(5)
+                .metadataFilters(Map.of())
+                .build());
+
+        assertThat(response.getCitations()).hasSize(1);
+        assertThat(response.getCitations().get(0).getDocId()).isEqualTo("2034259503927951361");
+        assertThat(response.getCitations().get(0).getChunkId()).isEqualTo("2034259503927951361-0");
     }
 
     private KnowledgeQueryService buildService(EmbeddingService embeddingService,

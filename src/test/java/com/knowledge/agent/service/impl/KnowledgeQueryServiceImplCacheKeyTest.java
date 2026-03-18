@@ -30,4 +30,28 @@ class KnowledgeQueryServiceImplCacheKeyTest {
 
         assertThat(baseKey).isNotEqualTo(anotherKey);
     }
+
+    @Test
+    @DisplayName("buildCacheKey should include mode")
+    void buildCacheKey_shouldIncludeMode() {
+        QueryRequestDTO kbRequest = QueryRequestDTO.builder()
+                .kbId("default-kb")
+                .question("What is Milvus?")
+                .mode("KB")
+                .topK(5)
+                .metadataFilters(Map.of())
+                .build();
+        QueryRequestDTO chatRequest = QueryRequestDTO.builder()
+                .kbId("default-kb")
+                .question("What is Milvus?")
+                .mode("CHAT")
+                .topK(5)
+                .metadataFilters(Map.of())
+                .build();
+
+        String kbKey = KnowledgeQueryServiceImpl.buildCacheKey(kbRequest);
+        String chatKey = KnowledgeQueryServiceImpl.buildCacheKey(chatRequest);
+
+        assertThat(kbKey).isNotEqualTo(chatKey);
+    }
 }

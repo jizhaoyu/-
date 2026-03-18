@@ -125,6 +125,7 @@ class KnowledgeBaseControllerTest {
         QueryRequestDTO request = QueryRequestDTO.builder()
                 .kbId("default-kb")
                 .question("what is rag")
+                .mode("KB")
                 .topK(5)
                 .build();
 
@@ -134,6 +135,49 @@ class KnowledgeBaseControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.answer").value("answer"));
+    }
+
+    @Test
+    @DisplayName("query endpoint should accept chat mode")
+    void query_shouldAcceptChatMode() throws Exception {
+        when(queryService.query(any(QueryRequestDTO.class))).thenReturn(QueryResponseVO.builder()
+                .answer("chat answer")
+                .citations(List.of())
+                .latencyMs(80L)
+                .traceId("trace-chat")
+                .build());
+
+        QueryRequestDTO request = QueryRequestDTO.builder()
+                .kbId("default-kb")
+                .question("hello")
+                .mode("CHAT")
+                .topK(5)
+                .build();
+
+        mockMvc.perform(post("/api/kb/query")
+                        .contentType("application/json")
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200))
+                .andExpect(jsonPath("$.data.answer").value("chat answer"));
+    }
+
+    @Test
+    @DisplayName("query endpoint should reject invalid mode")
+    void query_shouldRejectInvalidMode() throws Exception {
+        QueryRequestDTO request = QueryRequestDTO.builder()
+                .kbId("default-kb")
+                .question("hello")
+                .mode("INVALID")
+                .topK(5)
+                .build();
+
+        mockMvc.perform(post("/api/kb/query")
+                        .contentType("application/json")
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.message").value("mode must be KB or CHAT"));
     }
 
     @Test

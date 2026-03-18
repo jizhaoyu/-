@@ -221,11 +221,25 @@
                 <div class="section-head">
                     <div>
                         <p class="section-kicker">03 / Query</p>
-                        <h2>知识问答</h2>
+                        <h2>问答模式切换</h2>
                     </div>
-                    <p class="section-note">可选按文档 ID 过滤，便于精确验证单文档召回与回答质量。</p>
+                    <p id="query-section-note" class="section-note">当前为知识库问答，可选按文档 ID 过滤，便于收敛回答范围。</p>
                 </div>
                 <form id="query-form" class="panel-form panel-form-balanced">
+                    <fieldset class="field field-wide mode-switch-fieldset">
+                        <legend>问答模式</legend>
+                        <div class="mode-switch" role="radiogroup" aria-label="问答模式">
+                            <label class="mode-switch-option">
+                                <input id="query-mode-kb" name="queryMode" type="radio" value="KB" checked>
+                                <span>知识库问答</span>
+                            </label>
+                            <label class="mode-switch-option">
+                                <input id="query-mode-chat" name="queryMode" type="radio" value="CHAT">
+                                <span>普通聊天</span>
+                            </label>
+                        </div>
+                        <p id="query-mode-hint" class="field-hint">知识库问答会走检索增强流程，页面只展示最终回答结果。</p>
+                    </fieldset>
                     <label class="field">
                         <span>知识库 ID</span>
                         <input id="query-kb-id" name="kbId" type="text" value="default-kb" required>
@@ -234,12 +248,12 @@
                         <span>问题</span>
                         <textarea id="query-question" name="question" rows="5" placeholder="例如：这份文档主要讲了什么？" required></textarea>
                     </label>
-                    <div class="split-fields split-fields-tight">
-                        <label class="field">
+                    <div class="split-fields split-fields-tight query-advanced-fields">
+                        <label id="query-top-k-field" class="field">
                             <span>Top K</span>
                             <input id="query-top-k" name="topK" type="number" min="1" max="20" value="5" required>
                         </label>
-                        <label class="field">
+                        <label id="query-doc-id-field" class="field">
                             <span>限定文档 ID</span>
                             <input id="query-doc-id" name="docId" type="number" min="1" placeholder="可选">
                         </label>
@@ -249,7 +263,7 @@
                     </div>
                 </form>
                 <div id="query-result" class="result-panel muted-card result-panel-strong">
-                    <p>提交问题后，这里会展示答案、引用片段、耗时和 traceId。</p>
+                    <p>提交问题后，这里只展示最终回答结果。</p>
                 </div>
             </section>
 

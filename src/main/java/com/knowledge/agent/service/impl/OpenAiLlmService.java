@@ -2,6 +2,8 @@ package com.knowledge.agent.service.impl;
 
 import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.util.StrUtil;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.knowledge.agent.common.ErrorCodeEnum;
 import com.knowledge.agent.config.AiProperties;
 import com.knowledge.agent.exception.ServiceException;
@@ -13,6 +15,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.Data;
+import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
@@ -29,9 +32,11 @@ public class OpenAiLlmService implements LlmService {
 
     private final RestClient restClient;
     private final AiProperties aiProperties;
+    private final ObjectMapper objectMapper;
 
-    public OpenAiLlmService(AiProperties aiProperties) {
+    public OpenAiLlmService(AiProperties aiProperties, ObjectMapper objectMapper) {
         this.aiProperties = aiProperties;
+        this.objectMapper = objectMapper;
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         int timeoutMs = Math.toIntExact(Duration.ofSeconds(aiProperties.getTimeoutSeconds()).toMillis());
         requestFactory.setConnectTimeout(timeoutMs);
@@ -70,12 +75,17 @@ public class OpenAiLlmService implements LlmService {
         body.put("temperature", 1);
 
         try {
-            ChatCompletionResponse response = restClient.post()
+            String rawResponse = restClient.post()
                     .uri("/chat/completions")
-                    .headers(headers -> headers.setBearerAuth(apiKey))
+                    .headers(headers -> {
+                        headers.setBearerAuth(apiKey);
+                        headers.setContentType(MediaType.APPLICATION_JSON);
+                        headers.setAccept(List.of(MediaType.APPLICATION_JSON));
+                    })
                     .body(body)
                     .retrieve()
-                    .body(ChatCompletionResponse.class);
+                    .body(String.class);
+            ChatCompletionResponse response = parseChatCompletionResponse(rawResponse);
 
             if (response == null || CollectionUtil.isEmpty(response.getChoices())) {
                 throw new ServiceException(ErrorCodeEnum.LLM_FAILED, "empty llm response");
@@ -89,6 +99,31 @@ public class OpenAiLlmService implements LlmService {
             throw ex;
         } catch (Exception ex) {
             throw new ServiceException(ErrorCodeEnum.LLM_FAILED, "llm request failed: " + ex.getMessage());
+        }
+    }
+
+    ChatCompletionResponse parseChatCompletionResponse(String rawResponse) {
+        if (StrUtil.isBlank(rawResponse)) {
+            throw new ServiceException(ErrorCodeEnum.LLM_FAILED, "empty llm response");
+        }
+        try {
+            JsonNode rootNode = objectMapper.readTree(rawResponse);
+            JsonNode errorNode = rootNode.path("error");
+            if (!errorNode.isMissingNode() && !errorNode.isNull()) {
+                String errorMessage = errorNode.path("message").asText("unknown");
+                String errorType = errorNode.path("type").asText();
+                if (StrUtil.isNotBlank(errorType)) {
+                    errorMessage = errorMessage + " (" + errorType + ")";
+                }
+                throw new ServiceException(ErrorCodeEnum.LLM_FAILED, "llm provider error: " + errorMessage);
+            }
+            return objectMapper.treeToValue(rootNode, ChatCompletionResponse.class);
+        } catch (ServiceException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            String preview = StrUtil.maxLength(StrUtil.replace(rawResponse, "\n", " "), 200);
+            throw new ServiceException(ErrorCodeEnum.LLM_FAILED,
+                    "llm response parse failed, body preview: " + preview);
         }
     }
 
