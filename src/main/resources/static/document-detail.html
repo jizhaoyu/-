@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>文档详情</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@500;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="app.css">
+</head>
+<body class="detail-page">
+<div class="detail-page-shell">
+    <header class="detail-page-hero">
+        <div class="detail-page-head">
+            <p class="eyebrow">Document Detail</p>
+            <span class="detail-page-badge">Return with Context</span>
+            <h1>选中文档详情</h1>
+            <p class="detail-page-intro">元数据先展示、正文后补充，便于你先确认状态、错误信息与关键字段，再继续查看正文内容。</p>
+        </div>
+        <div class="detail-page-summary">
+            <div class="detail-page-summary-copy">
+                <p>从文档中心进入时，将保留原来的筛选条件、分页位置与选中项，返回时直接回到同一工作上下文。</p>
+            </div>
+            <div class="detail-page-actions">
+                <a id="detail-back-link" class="ghost-link detail-back-link" href="./#documents">返回文档中心</a>
+                <button id="detail-refresh" class="secondary-button" type="button">刷新详情</button>
+            </div>
+        </div>
+    </header>
+
+    <div id="detail-message" class="message hidden" role="status" aria-live="polite"></div>
+
+    <main class="detail-page-layout">
+        <section id="document-detail-view" class="detail-page-card muted-card">
+            <p>正在读取文档详情...</p>
+        </section>
+    </main>
+</div>
+<script src="detail.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "companyAnnouncements": [
+    "本仓库默认要求：每次开发前先阅读 CLAUDE.md，并按 docs/ 下的双端协同手册与任务模板执行。"
+  ]
+}

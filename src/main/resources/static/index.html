@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Knowledge Base Agent 控制台</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@500;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="page-shell">
+    <header class="hero">
+        <div class="hero-copy">
+            <div class="hero-copy-top">
+                <p class="eyebrow">Knowledge Base Agent Console</p>
+                <span class="hero-badge">Editorial Control Room</span>
+            </div>
+            <div class="hero-title-block">
+                <h1>知识库联调中枢</h1>
+                <p class="hero-text">
+                    把运行态检查、文档导入、索引跟踪与 RAG 问答收拢成一条连续工作流。首页更聚焦、更紧凑，让你更快进入有效联调，而不是先被展示区占满首屏。
+                </p>
+            </div>
+            <div class="hero-metrics" aria-label="控制台摘要">
+                <div class="hero-metric-card">
+                    <span>默认知识库</span>
+                    <strong id="hero-kb-id">default-kb</strong>
+                </div>
+                <div class="hero-metric-card">
+                    <span>向量模式</span>
+                    <strong id="hero-vector-mode">IN_MEMORY</strong>
+                </div>
+                <div class="hero-metric-card hero-metric-card-wide">
+                    <span>Embedding / Chat</span>
+                    <strong id="hero-model-pair">text-embedding-v2 / kimi-k2.5</strong>
+                </div>
+            </div>
+            <div class="hero-actions">
+                <a class="ghost-link" href="swagger-ui/index.html" target="_blank" rel="noreferrer">Swagger UI</a>
+                <a class="ghost-link" href="doc.html" target="_blank" rel="noreferrer">Knife4j</a>
+                <a class="ghost-link" href="actuator/health" target="_blank" rel="noreferrer">Actuator Health</a>
+            </div>
+        </div>
+        <div class="hero-panel" aria-label="联调摘要">
+            <div class="hero-panel-head">
+                <p class="hero-panel-kicker">Workspace Snapshot</p>
+                <h2>当前联调焦点</h2>
+                <p>先确认运行态，再导入文档、观察索引状态、回到文档中心核对详情，最后验证召回片段与答案质量。</p>
+            </div>
+            <div class="hero-stat-grid">
+                <div class="hero-stat hero-stat-highlight">
+                    <span>支持文件</span>
+                    <strong id="hero-supported-types">PDF / MD / TXT</strong>
+                </div>
+                <div class="hero-stat">
+                    <span>控制台入口</span>
+                    <strong><code>/</code> + <code>/api/kb</code></strong>
+                </div>
+                <div class="hero-stat">
+                    <span>典型流程</span>
+                    <strong>运行态 → 上传 → 文档中心 → 问答</strong>
+                </div>
+                <div class="hero-stat">
+                    <span>重点观察</span>
+                    <strong>状态、traceId、正文与引用片段</strong>
+                </div>
+            </div>
+            <div class="hero-rail" aria-label="操作节奏">
+                <div class="hero-rail-item">
+                    <span>操作节奏</span>
+                    <strong>先缩短确认链路，再放大可疑信号。</strong>
+                </div>
+                <div class="hero-rail-item">
+                    <span>本轮目标</span>
+                    <strong>环境确认、列表筛选、详情跳转与上下文恢复。</strong>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div id="global-message" class="message hidden" role="status" aria-live="polite"></div>
+
+    <div class="workspace-layout">
+        <aside class="workspace-sidebar" aria-label="控制台目录">
+            <div class="sidebar-panel">
+                <p class="section-kicker">Console Map</p>
+                <h2>目录</h2>
+                <p class="sidebar-text">按联调顺序切换模块，保持方位感，不在同一页里长距离滚动找操作入口。</p>
+                <nav id="directory-nav" class="directory-nav" aria-label="联调目录">
+                    <button class="directory-link is-active" type="button" data-nav-target="runtime">
+                        <span class="directory-index">01</span>
+                        <span class="directory-copy">
+                            <strong>运行态检查</strong>
+                            <small>先确认 MySQL、Milvus、Redis 与模型配置。</small>
+                        </span>
+                    </button>
+                    <button class="directory-link" type="button" data-nav-target="upload">
+                        <span class="directory-index">02</span>
+                        <span class="directory-copy">
+                            <strong>上传文档</strong>
+                            <small>提交文件并拿到文档 ID 与 traceId。</small>
+                        </span>
+                    </button>
+                    <button class="directory-link" type="button" data-nav-target="query">
+                        <span class="directory-index">03</span>
+                        <span class="directory-copy">
+                            <strong>知识问答</strong>
+                            <small>验证召回片段、答案内容与耗时。</small>
+                        </span>
+                    </button>
+                    <button class="directory-link" type="button" data-nav-target="documents">
+                        <span class="directory-index">04</span>
+                        <span class="directory-copy">
+                            <strong>文档中心</strong>
+                            <small>筛选列表、打开详情页、重建与删除集中处理。</small>
+                        </span>
+                    </button>
+                    <button class="directory-link" type="button" data-nav-target="playbook">
+                        <span class="directory-index">05</span>
+                        <span class="directory-copy">
+                            <strong>联调提示</strong>
+                            <small>按固定流程排查联调问题。</small>
+                        </span>
+                    </button>
+                </nav>
+            </div>
+        </aside>
+
+        <main class="dashboard">
+            <section id="section-runtime" class="card card-section card-wide card-runtime-overview is-active" data-section-id="runtime">
+                <div class="section-head">
+                    <div>
+                        <p class="section-kicker">01 / Runtime</p>
+                        <h2>运行态检查</h2>
+                    </div>
+                    <div class="section-head-side">
+                        <p class="section-note">优先确认数据库、向量库、缓存与模型配置是否处于可联调状态。</p>
+                        <div class="inline-actions">
+                            <button id="runtime-refresh" class="secondary-button" type="button">刷新运行态</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="runtime-layout">
+                    <div id="runtime-status-grid" class="runtime-status-grid">
+                        <article class="runtime-status-card runtime-status-card-pending">
+                            <p>正在探测数据库、Milvus、Redis 和 AI 配置...</p>
+                        </article>
+                    </div>
+                    <div class="runtime-config-grid">
+                        <div class="runtime-config-item">
+                            <span>默认知识库</span>
+                            <strong id="runtime-default-kb">default-kb</strong>
+                        </div>
+                        <div class="runtime-config-item">
+                            <span>向量模式</span>
+                            <strong id="runtime-vector-mode">IN_MEMORY</strong>
+                        </div>
+                        <div class="runtime-config-item">
+                            <span>Milvus Collection</span>
+                            <strong id="runtime-collection-name">kb_chunk</strong>
+                        </div>
+                        <div class="runtime-config-item">
+                            <span>切片策略</span>
+                            <strong id="runtime-chunk-strategy">800 / 120</strong>
+                        </div>
+                        <div class="runtime-config-item">
+                            <span>向量维度</span>
+                            <strong id="runtime-vector-dimension">1536</strong>
+                        </div>
+                        <div class="runtime-config-item">
+                            <span>文档总览</span>
+                            <strong id="runtime-document-summary">尚未加载</strong>
+                        </div>
+                        <div class="runtime-config-item runtime-config-item-wide">
+                            <span>存储路径</span>
+                            <strong id="runtime-storage-path">-</strong>
+                        </div>
+                        <div class="runtime-config-item runtime-config-item-wide">
+                            <span>说明</span>
+                            <p id="runtime-summary-note">页面会读取后端运行态，并把默认知识库同步到所有表单。</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="section-upload" class="card card-section card-upload" data-section-id="upload">
+                <div class="section-head">
+                    <div>
+                        <p class="section-kicker">02 / Import</p>
+                        <h2>上传文档</h2>
+                    </div>
+                    <p class="section-note">上传成功后会返回文档 ID 与 traceId，并立即进入异步索引。</p>
+                </div>
+                <form id="upload-form" class="panel-form panel-form-balanced">
+                    <label class="field">
+                        <span>知识库 ID</span>
+                        <input id="upload-kb-id" name="kbId" type="text" value="default-kb" required>
+                    </label>
+                    <label class="field">
+                        <span>标签</span>
+                        <input id="upload-tags" name="tags" type="text" placeholder="例如：spring,rag,guide">
+                    </label>
+                    <label class="field field-wide">
+                        <span>文件</span>
+                        <input id="upload-file" name="file" type="file" accept=".pdf,.md,.txt,text/plain,text/markdown,application/pdf" required>
+                    </label>
+                    <div class="form-foot">
+                        <p class="field-hint">单文件最大 20MB，仅支持 pdf / md / txt。</p>
+                        <button id="upload-submit" class="primary-button" type="submit">上传并索引</button>
+                    </div>
+                </form>
+                <div id="upload-result" class="result-panel muted-card result-panel-strong">
+                    <p>上传结果会显示在这里。</p>
+                </div>
+            </section>
+
+            <section id="section-query" class="card card-section card-query" data-section-id="query">
+                <div class="section-head">
+                    <div>
+                        <p class="section-kicker">03 / Query</p>
+                        <h2>知识问答</h2>
+                    </div>
+                    <p class="section-note">可选按文档 ID 过滤，便于精确验证单文档召回与回答质量。</p>
+                </div>
+                <form id="query-form" class="panel-form panel-form-balanced">
+                    <label class="field">
+                        <span>知识库 ID</span>
+                        <input id="query-kb-id" name="kbId" type="text" value="default-kb" required>
+                    </label>
+                    <label class="field field-wide">
+                        <span>问题</span>
+                        <textarea id="query-question" name="question" rows="5" placeholder="例如：这份文档主要讲了什么？" required></textarea>
+                    </label>
+                    <div class="split-fields split-fields-tight">
+                        <label class="field">
+                            <span>Top K</span>
+                            <input id="query-top-k" name="topK" type="number" min="1" max="20" value="5" required>
+                        </label>
+                        <label class="field">
+                            <span>限定文档 ID</span>
+                            <input id="query-doc-id" name="docId" type="number" min="1" placeholder="可选">
+                        </label>
+                    </div>
+                    <div class="form-foot form-foot-end">
+                        <button id="query-submit" class="primary-button" type="submit">发起问答</button>
+                    </div>
+                </form>
+                <div id="query-result" class="result-panel muted-card result-panel-strong">
+                    <p>提交问题后，这里会展示答案、引用片段、耗时和 traceId。</p>
+                </div>
+            </section>
+
+            <section id="section-documents" class="card card-section card-wide card-document-list" data-section-id="documents">
+                <div class="section-head">
+                    <div>
+                        <p class="section-kicker">04 / Documents</p>
+                        <h2>文档中心</h2>
+                    </div>
+                    <p class="section-note">把状态筛选、文档追踪、详情查看与重建删除统一收拢到一个模块里。</p>
+                </div>
+                <div class="documents-overview muted-card">
+                    <p>支持从详情页返回并恢复当前筛选、分页与选中文档，减少来回跳转时的定位成本。</p>
+                </div>
+                <form id="filter-form" class="filter-form filter-form-refined">
+                    <label class="field">
+                        <span>知识库 ID</span>
+                        <input id="filter-kb-id" name="kbId" type="text" value="default-kb" required>
+                    </label>
+                    <label class="field">
+                        <span>状态</span>
+                        <select id="filter-status" name="status">
+                            <option value="">全部</option>
+                            <option value="PROCESSING">PROCESSING / 索引中</option>
+                            <option value="READY">READY / 已就绪</option>
+                            <option value="FAILED">FAILED / 失败</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span>文件名</span>
+                        <input id="filter-file-name" name="fileName" type="text" placeholder="模糊搜索文件名">
+                    </label>
+                    <label class="field">
+                        <span>每页条数</span>
+                        <select id="filter-page-size" name="pageSize">
+                            <option value="10">10</option>
+                            <option value="20">20</option>
+                            <option value="50">50</option>
+                        </select>
+                    </label>
+                    <div class="filter-actions">
+                        <button id="filter-submit" class="primary-button" type="submit">查询列表</button>
+                        <button id="filter-refresh" class="secondary-button" type="button">刷新</button>
+                    </div>
+                </form>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>文件名</th>
+                            <th>状态</th>
+                            <th>标签</th>
+                            <th>更新时间</th>
+                            <th>操作</th>
+                        </tr>
+                        </thead>
+                        <tbody id="document-table-body">
+                        <tr>
+                            <td colspan="6" class="table-placeholder">正在准备文档列表...</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="table-footer table-footer-rich">
+                    <p id="list-summary">尚未加载。</p>
+                    <div class="pager">
+                        <button id="prev-page" class="secondary-button" type="button">上一页</button>
+                        <button id="next-page" class="secondary-button" type="button">下一页</button>
+                    </div>
+                </div>
+                <div class="document-detail-shell">
+                    <div class="subsection-head">
+                        <div>
+                            <p class="subsection-kicker">Document Detail</p>
+                            <h3>文档状态跟踪</h3>
+                        </div>
+                        <p class="subsection-note">点击表格中的“详情”会跳转到独立详情页；上传或重建后，这里会继续展示最近一次文档跟踪结果。</p>
+                    </div>
+                    <div id="document-detail" class="detail-panel muted-card detail-panel-strong">
+                        <p>上传或重建后，这里会展示最近一次跟踪文档的详情与正文。列表里的“详情”按钮会打开 <code>/details-{id}</code> 页面。</p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="section-playbook" class="card card-section card-tips" data-section-id="playbook">
+                <div class="section-head">
+                    <div>
+                        <p class="section-kicker">05 / Playbook</p>
+                        <h2>联调提示</h2>
+                    </div>
+                    <p class="section-note">把它当作联调脚本：先环境、再导入、再索引、最后问答验证。</p>
+                </div>
+                <div class="tips-panel muted-card result-panel-strong">
+                    <ul class="tips-list">
+                        <li>先看“运行态检查”卡片，如果 MySQL、Milvus 或 AI Provider 不是可用状态，优先处理环境问题。</li>
+                        <li>上传后若状态长期停留在 <code>PROCESSING</code>，先检查数据库、向量库和 AI 配置。</li>
+                        <li>问答接口没有命中内容时，会返回降级提示，而不是空页面。</li>
+                        <li>页面根路径 <code>/</code> 就是本地 demo 控制台，列表和问答默认共用同一个知识库 ID。</li>
+                    </ul>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+<script src="app.js" defer></script>
+</body>
+</html>

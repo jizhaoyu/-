@@ -1,0 +1,10 @@
+target/
+.idea/
+data/
+milvus-volumes/
+*.iml
+.m2/
+docker-data/
+*.log
+.claude/settings.local.json
+src/main/resources/application-local.yml

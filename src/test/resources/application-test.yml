@@ -1,0 +1,13 @@
+app:
+  milvus:
+    enabled: false
+  ai:
+    base-url: http://localhost:18080/v1
+    api-key: test-key
+    embedding-model: test-embedding
+    chat-model: test-chat
+
+spring:
+  sql:
+    init:
+      mode: never
