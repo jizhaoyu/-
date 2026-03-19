@@ -102,10 +102,10 @@ function renderDocumentDetail(documentDetail) {
     refs.documentDetailView.innerHTML = `
         <div class="detail-page-card-head">
             <div class="detail-title">
-                <h3>${escapeHtml(documentDetail.fileName || "文档详情")}</h3>
+                <h3 data-testid="detail-document-title">${escapeHtml(documentDetail.fileName || "文档详情")}</h3>
                 ${renderStatus(documentDetail.status)}
             </div>
-            <p class="detail-page-doc-id">文档 ID #${escapeHtml(documentDetail.documentId)}</p>
+            <p class="detail-page-doc-id" data-testid="detail-document-id">文档 ID #${escapeHtml(documentDetail.documentId)}</p>
         </div>
         <div class="meta-grid detail-page-meta-grid">
             <div class="meta-item">
@@ -133,7 +133,7 @@ function renderDocumentDetail(documentDetail) {
                 <strong>${escapeHtml(formatDateTime(documentDetail.indexedAt))}</strong>
             </div>
         </div>
-        <div class="${errorBlockClass}">
+        <div class="${errorBlockClass}" data-testid="detail-error-block">
             ${documentDetail.errorMessage
                 ? `<strong>错误信息：</strong> ${escapeHtml(documentDetail.errorMessage)}`
                 : "当前文档没有错误信息。"}
@@ -143,7 +143,7 @@ function renderDocumentDetail(documentDetail) {
                 <h4>文档正文</h4>
                 <p class="detail-section-note">按纯文本展示，避免执行文档中的 HTML 或脚本。</p>
             </div>
-            <div class="document-content-panel detail-page-content-panel" data-role="document-content">${renderDocumentContent()}</div>
+            <div class="document-content-panel detail-page-content-panel" data-role="document-content" data-testid="detail-document-content">${renderDocumentContent()}</div>
         </section>
     `;
 }

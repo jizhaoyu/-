@@ -275,17 +275,37 @@
                     </div>
                     <p class="section-note">把状态筛选、文档追踪、详情查看与重建删除统一收拢到一个模块里。</p>
                 </div>
-                <div class="documents-overview muted-card">
-                    <p>支持从详情页返回并恢复当前筛选、分页与选中文档，减少来回跳转时的定位成本。</p>
+                <div class="documents-overview muted-card" data-testid="documents-context-bar">
+                    <div class="documents-overview-grid">
+                        <div class="overview-item">
+                            <span>当前知识库</span>
+                            <strong id="documents-current-kb" data-testid="documents-current-kb">default-kb</strong>
+                        </div>
+                        <div class="overview-item overview-item-wide">
+                            <span>活跃筛选</span>
+                            <strong id="documents-active-filters" data-testid="documents-active-filters">全部文档</strong>
+                        </div>
+                        <div class="overview-item">
+                            <span>结果摘要</span>
+                            <strong id="documents-result-summary" data-testid="documents-result-summary">尚未加载</strong>
+                        </div>
+                        <div class="overview-item overview-item-wide">
+                            <span>当前选中</span>
+                            <strong id="documents-selected-summary" data-testid="documents-selected-summary">尚未选中文档</strong>
+                        </div>
+                    </div>
+                    <div class="documents-overview-actions">
+                        <button id="filter-reset" class="secondary-button" type="button" data-testid="documents-reset-filters">清空筛选</button>
+                    </div>
                 </div>
-                <form id="filter-form" class="filter-form filter-form-refined">
+                <form id="filter-form" class="filter-form filter-form-refined" data-testid="documents-filter-form">
                     <label class="field">
                         <span>知识库 ID</span>
-                        <input id="filter-kb-id" name="kbId" type="text" value="default-kb" required>
+                        <input id="filter-kb-id" name="kbId" type="text" value="default-kb" required data-testid="documents-kb-id">
                     </label>
                     <label class="field">
                         <span>状态</span>
-                        <select id="filter-status" name="status">
+                        <select id="filter-status" name="status" data-testid="documents-status-filter">
                             <option value="">全部</option>
                             <option value="PROCESSING">PROCESSING / 索引中</option>
                             <option value="READY">READY / 已就绪</option>
@@ -294,23 +314,29 @@
                     </label>
                     <label class="field">
                         <span>文件名</span>
-                        <input id="filter-file-name" name="fileName" type="text" placeholder="模糊搜索文件名">
+                        <input id="filter-file-name" name="fileName" type="text" placeholder="模糊搜索文件名" data-testid="documents-file-name-filter">
                     </label>
                     <label class="field">
                         <span>每页条数</span>
-                        <select id="filter-page-size" name="pageSize">
+                        <select id="filter-page-size" name="pageSize" data-testid="documents-page-size-filter">
                             <option value="10">10</option>
                             <option value="20">20</option>
                             <option value="50">50</option>
                         </select>
                     </label>
                     <div class="filter-actions">
-                        <button id="filter-submit" class="primary-button" type="submit">查询列表</button>
-                        <button id="filter-refresh" class="secondary-button" type="button">刷新</button>
+                        <button id="filter-submit" class="primary-button" type="submit" data-testid="documents-submit-filter">查询列表</button>
+                        <button id="filter-refresh" class="secondary-button" type="button" data-testid="documents-refresh-list">刷新</button>
                     </div>
                 </form>
-                <div class="table-wrap">
-                    <table>
+                <div class="filter-shortcuts" role="group" aria-label="状态快捷筛选" data-testid="documents-status-shortcuts">
+                    <button class="filter-shortcut is-active" type="button" data-status-shortcut="" data-testid="documents-status-shortcut-all">全部</button>
+                    <button class="filter-shortcut" type="button" data-status-shortcut="READY" data-testid="documents-status-shortcut-ready">已就绪</button>
+                    <button class="filter-shortcut" type="button" data-status-shortcut="PROCESSING" data-testid="documents-status-shortcut-processing">索引中</button>
+                    <button class="filter-shortcut" type="button" data-status-shortcut="FAILED" data-testid="documents-status-shortcut-failed">失败</button>
+                </div>
+                <div class="table-wrap" data-testid="documents-table-wrap">
+                    <table data-testid="documents-table">
                         <thead>
                         <tr>
                             <th>ID</th>
@@ -321,7 +347,7 @@
                             <th>操作</th>
                         </tr>
                         </thead>
-                        <tbody id="document-table-body">
+                        <tbody id="document-table-body" data-testid="documents-table-body">
                         <tr>
                             <td colspan="6" class="table-placeholder">正在准备文档列表...</td>
                         </tr>
@@ -329,22 +355,25 @@
                     </table>
                 </div>
                 <div class="table-footer table-footer-rich">
-                    <p id="list-summary">尚未加载。</p>
-                    <div class="pager">
-                        <button id="prev-page" class="secondary-button" type="button">上一页</button>
-                        <button id="next-page" class="secondary-button" type="button">下一页</button>
+                    <p id="list-summary" data-testid="documents-list-summary">尚未加载。</p>
+                    <div class="pager" data-testid="documents-pager">
+                        <button id="prev-page" class="secondary-button" type="button" data-testid="documents-prev-page">上一页</button>
+                        <button id="next-page" class="secondary-button" type="button" data-testid="documents-next-page">下一页</button>
                     </div>
                 </div>
                 <div class="document-detail-shell">
                     <div class="subsection-head">
                         <div>
-                            <p class="subsection-kicker">Document Detail</p>
+                            <p class="subsection-kicker">Document Workspace</p>
                             <h3>文档状态跟踪</h3>
                         </div>
-                        <p class="subsection-note">点击表格中的“详情”会跳转到独立详情页；上传或重建后，这里会继续展示最近一次文档跟踪结果。</p>
+                        <p class="subsection-note">点击表格行会在下方联动详情；点击“详情”仍跳转独立 <code>/details-{id}</code> 页面。</p>
                     </div>
-                    <div id="document-detail" class="detail-panel muted-card detail-panel-strong">
-                        <p>上传或重建后，这里会展示最近一次跟踪文档的详情与正文。列表里的“详情”按钮会打开 <code>/details-{id}</code> 页面。</p>
+                    <div id="document-detail" class="detail-panel muted-card detail-panel-strong" data-testid="document-detail-panel">
+                        <div class="detail-empty-state">
+                            <strong>先选一条文档开始查看。</strong>
+                            <p>点击表格行可在下方打开详情面板；点击“详情”按钮会进入独立详情页。</p>
+                        </div>
                     </div>
                 </div>
             </section>

@@ -30,7 +30,8 @@ const state = {
     isLoadingDocuments: false,
     messageTimer: null,
     restoredDocumentsContext: readDocumentsContext(),
-    shouldRestoreSelectedDocument: false
+    shouldRestoreSelectedDocument: false,
+    documentRecords: []
 };
 
 const refs = {};
@@ -105,6 +106,12 @@ function cacheElements() {
     refs.filterPageSize = document.getElementById("filter-page-size");
     refs.filterSubmit = document.getElementById("filter-submit");
     refs.filterRefresh = document.getElementById("filter-refresh");
+    refs.filterReset = document.getElementById("filter-reset");
+    refs.statusShortcutButtons = Array.from(document.querySelectorAll("[data-status-shortcut]"));
+    refs.documentsCurrentKb = document.getElementById("documents-current-kb");
+    refs.documentsActiveFilters = document.getElementById("documents-active-filters");
+    refs.documentsResultSummary = document.getElementById("documents-result-summary");
+    refs.documentsSelectedSummary = document.getElementById("documents-selected-summary");
     refs.documentTableBody = document.getElementById("document-table-body");
     refs.listSummary = document.getElementById("list-summary");
     refs.prevPage = document.getElementById("prev-page");
@@ -124,6 +131,10 @@ function bindEvents() {
     });
     refs.filterForm.addEventListener("submit", handleFilterSubmit);
     refs.filterRefresh.addEventListener("click", () => loadDocuments().catch(handlePageError));
+    refs.filterReset.addEventListener("click", handleFilterReset);
+    refs.statusShortcutButtons.forEach((button) => {
+        button.addEventListener("click", handleStatusShortcutClick);
+    });
     refs.prevPage.addEventListener("click", () => {
         if (!state.isLoadingDocuments && state.pageNum > 1) {
             loadDocuments(state.pageNum - 1).catch(handlePageError);
@@ -365,6 +376,102 @@ function setButtonBusy(button, isBusy, busyText) {
     }
 }
 
+function setStatusShortcutState(status) {
+    refs.statusShortcutButtons.forEach((button) => {
+        const isActive = button.dataset.statusShortcut === status;
+        button.classList.toggle("is-active", isActive);
+        button.setAttribute("aria-pressed", String(isActive));
+    });
+}
+
+function getActiveFilterSummary() {
+    const parts = [];
+    const status = refs.filterStatus.value;
+    const fileName = refs.filterFileName.value.trim();
+
+    if (status) {
+        parts.push(`状态 ${status}`);
+    }
+    if (fileName) {
+        parts.push(`文件名包含 “${fileName}”`);
+    }
+    if (!parts.length) {
+        parts.push("全部文档");
+    }
+
+    parts.push(`每页 ${state.pageSize} 条`);
+    return parts.join(" · ");
+}
+
+function updateDocumentsOverview(records = state.documentRecords) {
+    refs.documentsCurrentKb.textContent = refs.filterKbId.value.trim() || "default-kb";
+    refs.documentsActiveFilters.textContent = getActiveFilterSummary();
+    refs.documentsResultSummary.textContent = state.isLoadingDocuments
+        ? "正在加载列表..."
+        : `第 ${state.pageNum} 页 · 当前 ${records.length} 条 / 总计 ${state.total} 条`;
+
+    if (!state.selectedDocumentId) {
+        refs.documentsSelectedSummary.textContent = "尚未选中文档";
+        return;
+    }
+
+    const selectedRecord = records.find((item) => normalizeOptionalId(item.documentId) === state.selectedDocumentId);
+    if (!selectedRecord) {
+        refs.documentsSelectedSummary.textContent = `已选中文档 #${state.selectedDocumentId}`;
+        return;
+    }
+
+    refs.documentsSelectedSummary.textContent = `#${selectedRecord.documentId} · ${selectedRecord.fileName} · ${selectedRecord.status}`;
+}
+
+function resetDocumentDetailPanel(message) {
+    state.selectedDocumentId = null;
+    state.documentContent = {
+        documentId: null,
+        status: "idle",
+        content: "",
+        error: ""
+    };
+    refs.queryDocId.value = "";
+    refs.documentDetail.innerHTML = `
+        <div class="detail-empty-state">
+            <strong>${escapeHtml(message || "先选一条文档开始查看。")}</strong>
+            <p>点击表格行可在下方打开详情面板；点击“详情”按钮会进入独立详情页。</p>
+        </div>
+    `;
+    highlightSelectedRow(null);
+    persistDocumentsContext({ selectedDocumentId: null });
+    updateDocumentsOverview();
+}
+
+function handleFilterReset() {
+    refs.filterStatus.value = "";
+    refs.filterFileName.value = "";
+    refs.filterPageSize.value = "10";
+    state.pageNum = 1;
+    state.pageSize = 10;
+    setStatusShortcutState("");
+    persistDocumentsContext({
+        status: "",
+        fileName: "",
+        pageNum: 1,
+        pageSize: 10,
+        selectedDocumentId: null
+    });
+    resetDocumentDetailPanel("筛选已清空，重新从列表选择文档。");
+    loadDocuments(1).catch(handlePageError);
+}
+
+function handleStatusShortcutClick(event) {
+    const button = event.currentTarget;
+    const status = button.dataset.statusShortcut || "";
+    refs.filterStatus.value = status;
+    setStatusShortcutState(status);
+    state.pageNum = 1;
+    persistDocumentsContext({ status, pageNum: 1 });
+    loadDocuments(1).catch(handlePageError);
+}
+
 function hideMessage() {
     window.clearTimeout(state.messageTimer);
     state.messageTimer = null;
@@ -443,16 +550,16 @@ function formatSourceType(value) {
 function renderDocumentContent() {
     const currentContent = state.documentContent;
     if (!currentContent || currentContent.documentId !== state.selectedDocumentId) {
-        return '<p class="document-content-placeholder">上传或重建后，这里会显示当前跟踪文档的正文。</p>';
+        return '<p class="document-content-placeholder">选中文档后，这里会加载正文内容。</p>';
     }
     if (currentContent.status === "loading") {
-        return '<p class="document-content-loading">正文加载中...</p>';
+        return '<p class="document-content-loading">正在加载正文内容...</p>';
     }
     if (currentContent.status === "error") {
         return `<p class="document-content-error">正文加载失败：${escapeHtml(currentContent.error || "未知错误")}</p>`;
     }
     if (!currentContent.content) {
-        return '<p class="document-content-empty">文档正文为空。</p>';
+        return '<p class="document-content-empty">当前文档没有可展示的正文内容。</p>';
     }
     return `<div class="document-content-body">${escapeHtml(currentContent.content)}</div>`;
 }
@@ -603,6 +710,7 @@ async function handleFilterSubmit(event) {
     event.preventDefault();
     try {
         state.pageNum = 1;
+        setStatusShortcutState(refs.filterStatus.value);
         await loadDocuments(1);
     } catch (error) {
         handlePageError(error);
@@ -613,12 +721,14 @@ async function loadDocuments(pageNum = state.pageNum) {
     state.pageNum = normalizePositiveInt(pageNum, 1);
     state.pageSize = normalizePositiveInt(Number(refs.filterPageSize.value), state.pageSize || 10);
     refs.filterPageSize.value = String(state.pageSize);
+    setStatusShortcutState(refs.filterStatus.value);
     setDocumentListBusy(true);
     refs.documentTableBody.innerHTML = `
         <tr>
             <td colspan="6" class="table-placeholder">正在加载文档列表...</td>
         </tr>
     `;
+    updateDocumentsOverview();
 
     const params = new URLSearchParams({
         kbId: refs.filterKbId.value.trim(),
@@ -637,6 +747,7 @@ async function loadDocuments(pageNum = state.pageNum) {
         const page = await request(`/documents?${params.toString()}`);
         const records = page.records || [];
 
+        state.documentRecords = records;
         state.total = Number(page.total) || 0;
         state.pageNum = normalizePositiveInt(page.pageNum, 1);
         state.pageSize = normalizePositiveInt(page.pageSize, state.pageSize);
@@ -645,11 +756,14 @@ async function loadDocuments(pageNum = state.pageNum) {
         renderDocumentTable(records);
         updateDocumentSummary(records, state.total);
         updatePagination();
+        updateDocumentsOverview(records);
         persistDocumentsContext();
         await restoreSelectedDocumentPanelIfNeeded(records);
+        updateDocumentsOverview(records);
     } finally {
         setDocumentListBusy(false);
         updatePagination();
+        updateDocumentsOverview();
     }
 }
 
@@ -673,7 +787,7 @@ function renderDocumentTable(records) {
     if (!records || records.length === 0) {
         refs.documentTableBody.innerHTML = `
             <tr>
-                <td colspan="6" class="table-placeholder">当前筛选条件下没有文档。</td>
+                <td colspan="6" class="table-placeholder">当前筛选条件下没有文档，请调整筛选条件或清空筛选后重试。</td>
             </tr>
         `;
         return;
@@ -681,8 +795,9 @@ function renderDocumentTable(records) {
 
     refs.documentTableBody.innerHTML = records.map((doc) => {
         const documentId = normalizeOptionalId(doc.documentId);
+        const isActive = documentId && documentId === state.selectedDocumentId;
         return `
-            <tr class="${documentId && documentId === state.selectedDocumentId ? "active-row" : ""}">
+            <tr class="${isActive ? "active-row" : ""}" data-document-row data-id="${escapeHtml(doc.documentId)}" data-testid="documents-row-${escapeHtml(doc.documentId)}" aria-selected="${isActive ? "true" : "false"}" tabindex="0">
                 <td>${escapeHtml(doc.documentId)}</td>
                 <td>
                     <strong>${escapeHtml(doc.fileName)}</strong><br>
@@ -693,9 +808,9 @@ function renderDocumentTable(records) {
                 <td>${escapeHtml(formatDateTime(doc.updatedAt))}</td>
                 <td>
                     <div class="inline-actions">
-                        <button class="table-action" type="button" data-action="detail" data-id="${escapeHtml(doc.documentId)}">详情</button>
-                        <button class="table-action" type="button" data-action="reindex" data-id="${escapeHtml(doc.documentId)}">重建</button>
-                        <button class="table-action" type="button" data-tone="danger" data-action="delete" data-id="${escapeHtml(doc.documentId)}">删除</button>
+                        <button class="table-action" type="button" data-action="detail" data-id="${escapeHtml(doc.documentId)}" data-testid="documents-open-detail-${escapeHtml(doc.documentId)}">详情</button>
+                        <button class="table-action" type="button" data-action="reindex" data-id="${escapeHtml(doc.documentId)}" data-testid="documents-reindex-${escapeHtml(doc.documentId)}">重建</button>
+                        <button class="table-action" type="button" data-tone="danger" data-action="delete" data-id="${escapeHtml(doc.documentId)}" data-testid="documents-delete-${escapeHtml(doc.documentId)}">删除</button>
                     </div>
                 </td>
             </tr>
@@ -712,39 +827,50 @@ function updatePagination() {
 
 async function handleTableAction(event) {
     const button = event.target.closest("button[data-action]");
-    if (!button) {
-        return;
-    }
-
-    const action = button.dataset.action;
-    const documentId = normalizeOptionalId(button.dataset.id);
-    if (!documentId) {
-        return;
-    }
-
-    try {
-        if (action === "detail") {
-            persistDocumentsContext({
-                activeSection: "documents",
-                selectedDocumentId: documentId,
-                pageNum: state.pageNum,
-                pageSize: state.pageSize
-            });
-            window.location.href = buildDocumentDetailUrl(documentId);
+    if (button) {
+        const action = button.dataset.action;
+        const documentId = normalizeOptionalId(button.dataset.id);
+        if (!documentId) {
             return;
         }
 
-        if (action === "reindex") {
-            await reindexDocument(documentId, button);
-            return;
-        }
+        try {
+            if (action === "detail") {
+                persistDocumentsContext({
+                    activeSection: "documents",
+                    selectedDocumentId: documentId,
+                    pageNum: state.pageNum,
+                    pageSize: state.pageSize
+                });
+                window.location.href = buildDocumentDetailUrl(documentId);
+                return;
+            }
 
-        if (action === "delete") {
-            await deleteDocument(documentId, button);
+            if (action === "reindex") {
+                await reindexDocument(documentId, button);
+                return;
+            }
+
+            if (action === "delete") {
+                await deleteDocument(documentId, button);
+            }
+        } catch (error) {
+            handlePageError(error);
         }
-    } catch (error) {
-        handlePageError(error);
+        return;
     }
+
+    const row = event.target.closest("tr[data-document-row]");
+    if (!row) {
+        return;
+    }
+
+    const documentId = normalizeOptionalId(row.dataset.id);
+    if (!documentId || state.isLoadingDocuments) {
+        return;
+    }
+
+    loadDocumentDetail(documentId).catch(handlePageError);
 }
 
 async function loadDocumentDetail(documentId, silent = false) {
@@ -776,10 +902,10 @@ function renderDocumentDetail(documentDetail) {
 
     refs.documentDetail.innerHTML = `
         <div class="detail-title">
-            <h3>${escapeHtml(documentDetail.fileName || "文档详情")}</h3>
+            <h3 data-testid="document-detail-title">${escapeHtml(documentDetail.fileName || "文档详情")}</h3>
             ${renderStatus(documentDetail.status)}
         </div>
-        <p class="detail-page-doc-id">文档 ID #${escapeHtml(documentDetail.documentId)} · <a class="inline-link" href="${escapeHtml(detailUrl)}">独立详情页</a></p>
+        <p class="detail-page-doc-id" data-testid="document-detail-id">文档 ID #${escapeHtml(documentDetail.documentId)} · <a class="inline-link" href="${escapeHtml(detailUrl)}" data-testid="document-detail-link">独立详情页</a></p>
         <div class="meta-grid">
             <div class="meta-item">
                 <span>文档 ID</span>
@@ -806,7 +932,7 @@ function renderDocumentDetail(documentDetail) {
                 <strong>${escapeHtml(formatDateTime(documentDetail.indexedAt))}</strong>
             </div>
         </div>
-        <div class="${errorBlockClass}">
+        <div class="${errorBlockClass}" data-testid="document-detail-error-block">
             ${documentDetail.errorMessage
                 ? `<strong>错误信息：</strong> ${escapeHtml(documentDetail.errorMessage)}`
                 : "当前文档没有错误信息。"}
@@ -816,9 +942,10 @@ function renderDocumentDetail(documentDetail) {
                 <h4>文档正文</h4>
                 <p class="detail-section-note">按纯文本显示，避免执行文档中的 HTML 或脚本。</p>
             </div>
-            <div class="document-content-panel" data-role="document-content">${renderDocumentContent()}</div>
+            <div class="document-content-panel" data-role="document-content" data-testid="document-detail-content">${renderDocumentContent()}</div>
         </section>
     `;
+    updateDocumentsOverview();
 }
 
 async function reindexDocument(documentId, button) {
@@ -862,17 +989,7 @@ async function deleteDocument(documentId, button) {
         });
         showMessage("success", `文档 #${normalizedDocumentId} 已删除。`);
         if (state.selectedDocumentId === normalizedDocumentId) {
-            state.selectedDocumentId = null;
-            state.documentContent = {
-                documentId: null,
-                status: "idle",
-                content: "",
-                error: ""
-            };
-            refs.queryDocId.value = "";
-            refs.documentDetail.innerHTML = "<div class=\"detail-empty-state\"><strong>已删除当前跟踪文档。</strong><p>你可以重新上传，或从列表打开其他文档详情页。</p></div>";
-            highlightSelectedRow(null);
-            persistDocumentsContext({ selectedDocumentId: null });
+            resetDocumentDetailPanel("已删除当前跟踪文档。");
         }
         const totalPages = Math.max(1, Math.ceil(Math.max(state.total - 1, 0) / state.pageSize));
         const targetPage = Math.min(state.pageNum, totalPages);
@@ -928,20 +1045,25 @@ function trackDocumentStatus(documentId, attempts = 20) {
 
 function highlightSelectedRow(documentId) {
     const normalizedDocumentId = normalizeOptionalId(documentId);
-    refs.documentTableBody.querySelectorAll("tr").forEach((row) => row.classList.remove("active-row"));
+    refs.documentTableBody.querySelectorAll("tr[data-document-row]").forEach((row) => {
+        row.classList.remove("active-row");
+        row.setAttribute("aria-selected", "false");
+    });
     if (!normalizedDocumentId) {
         return;
     }
-    const selectedButton = refs.documentTableBody.querySelector(`button[data-action="detail"][data-id="${CSS.escape(normalizedDocumentId)}"]`);
-    const selectedRow = selectedButton ? selectedButton.closest("tr") : null;
+    const selectedRow = refs.documentTableBody.querySelector(`tr[data-document-row][data-id="${CSS.escape(normalizedDocumentId)}"]`);
     if (selectedRow) {
         selectedRow.classList.add("active-row");
+        selectedRow.setAttribute("aria-selected", "true");
     }
 }
 
 function applyStoredDocumentsContext() {
     const savedContext = state.restoredDocumentsContext;
     if (!savedContext) {
+        setStatusShortcutState(refs.filterStatus.value);
+        updateDocumentsOverview();
         return;
     }
 
@@ -959,6 +1081,8 @@ function applyStoredDocumentsContext() {
 
     state.selectedDocumentId = normalizeOptionalId(savedContext.selectedDocumentId);
     state.shouldRestoreSelectedDocument = Boolean(state.selectedDocumentId);
+    setStatusShortcutState(refs.filterStatus.value);
+    updateDocumentsOverview();
 }
 
 function readDocumentsContext() {

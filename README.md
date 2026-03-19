@@ -8,6 +8,7 @@
 - 支持 `IN_MEMORY` 与 `MILVUS` 两种向量存储模式
 - 基于 `embedding + 检索 + LLM` 完成知识库问答
 - 支持文档详情页与正文查看
+- 文档中心支持上下文摘要、状态快捷筛选、行内详情联动与返回态恢复
 - 提供运行态检查接口，展示 `MySQL`、`Redis`、`Milvus`、`AI Provider` 状态
 - 当知识未命中时，可降级为普通 AI 聊天
 - 当模型暂时不可用时，返回可人工核对的引用片段
@@ -35,6 +36,9 @@
 │  └─ static                内置前端页面与静态资源
 ├─ src/test                 单元测试与接口测试
 ├─ docs                     协作文档、环境准备、执行清单
+├─ package.json             Playwright E2E 脚本与依赖
+├─ playwright.config.ts     Playwright 运行配置
+├─ tests/playwright         E2E 用例目录约定
 ├─ docker-compose.yml       Milvus 依赖编排
 └─ README.md                当前说明文档
 ```
@@ -162,8 +166,18 @@ mvn -DskipTests spring-boot:run
 
 页面路由：
 
-- `/`：首页
-- `/details-{id}`：文档详情页
+- `/`：首页与文档工作台
+- `/details-{id}`：独立文档详情页
+
+## 文档工作台
+
+首页中的“文档中心”区域已补齐一套更适合联调和回归测试的工作流：
+
+- 顶部上下文栏会展示当前知识库、活跃筛选、结果摘要和当前选中文档
+- 支持 `READY`、`PROCESSING`、`FAILED` 的快捷筛选，并可一键清空筛选条件
+- 点击表格行可在当前页下方联动打开详情面板，减少在列表和详情页之间反复跳转
+- 点击“详情”按钮仍会进入 `/details-{id}` 独立页面，返回时会恢复原来的筛选、分页和选中状态
+- 页面元素已补充 `data-testid`，便于后续 Playwright 自动化用例稳定定位
 
 ## 问答策略
 
@@ -216,6 +230,20 @@ mvn test
 ```
 
 建议优先使用 `JDK 17` 跑测试，避免较新 JDK 与 Mockito agent 的兼容问题。
+
+E2E 骨架：
+
+```powershell
+npm install
+npx playwright install chromium
+npm run test:e2e
+```
+
+补充说明：
+
+- Playwright 基础配置位于 [playwright.config.ts](playwright.config.ts)
+- 默认基于 `http://127.0.0.1:8080` 执行，可通过 `PLAYWRIGHT_BASE_URL` 或 `PLAYWRIGHT_BASE_PORT` 覆盖
+- 当前仓库已接入 E2E 依赖、脚本和稳定选择器，具体用例约定放在 `tests/playwright/`
 
 ## 相关文档
 
