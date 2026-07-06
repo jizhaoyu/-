@@ -1,6 +1,6 @@
 # 图书馆预约管理系统 v2.0
 
-> 前后端分离架构 · Vue3 + Vite 前端 · Python Flask 后端 · SQLite 数据库
+> 前后端分离架构 · Vue3 + Vite 前端 · Python Flask 后端 · MySQL 数据库
 
 ## 📋 项目简介
 
@@ -9,7 +9,7 @@
 ## ✨ 主要特性
 
 - ✅ **前后端分离**：Vue3 + Vite 前端 + Python Flask 后端
-- ✅ **数据库存储**：使用 SQLite 持久化账号与预约数据
+- ✅ **数据库存储**：使用 MySQL 持久化账号与预约数据（可回退 SQLite）
 - ✅ **GSAP 动画**：流畅的页面交互动画效果
 - ✅ **Token 管理**：自动解析 JWT、实时监控过期状态
 - ✅ **多账号支持**：可管理多个图书馆账号
@@ -23,7 +23,8 @@ QFNULibraryBook-main/
 ├── backend/                       # 后端服务（Flask）
 │   ├── app.py                     # Flask 主程序
 │   ├── requirements.txt           # Python 依赖
-│   ├── library.db                 # SQLite 数据库（自动创建）
+│   ├── .env.example               # 数据库配置模板（复制为 .env）
+│   ├── init_db.sql                # MySQL 建库脚本
 │   ├── database/db.py             # 数据库初始化
 │   ├── models/account.py          # 账号和预约记录模型
 │   ├── routes/                    # API 路由
@@ -51,9 +52,39 @@ QFNULibraryBook-main/
 
 - **Python**: 3.7+
 - **Node.js**: 16+（含 npm）
+- **MySQL**: 5.7+ / 8.0+
 - **浏览器**: Chrome/Edge/Firefox 最新版
 
-### 1️⃣ 一键启动全部服务
+### 1️⃣ 准备 MySQL 数据库
+
+先创建数据库（表结构由后端首次启动时自动创建）：
+
+```bash
+mysql -u root -p < backend/init_db.sql
+```
+
+再复制配置模板并填入你的数据库账号密码：
+
+```bash
+cd backend
+cp .env.example .env      # Windows: copy .env.example .env
+# 编辑 .env，修改 DB_USER / DB_PASSWORD 等
+```
+
+`.env` 关键配置：
+
+```env
+DB_TYPE=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=你的密码
+DB_NAME=library_reservation
+```
+
+> 想临时用免安装的 SQLite？把 `DB_TYPE` 改成 `sqlite` 即可，其余配置忽略。
+
+### 2️⃣ 一键启动全部服务
 
 双击 `启动全部服务.bat`（Windows）或运行 `启动全部服务.sh`（macOS/Linux），脚本会自动：
 
@@ -77,7 +108,7 @@ npm install
 npm run dev
 ```
 
-### 2️⃣ 打开浏览器
+### 3️⃣ 打开浏览器
 
 访问 http://127.0.0.1:8080 即可使用系统。前端通过 Vite 的 `/api` 代理访问后端，无需额外配置跨域。
 
@@ -134,15 +165,16 @@ npm run dev
 
 ## 🎨 技术栈
 
-**后端**：Flask 3.0 · SQLAlchemy · Flask-CORS · Requests · Cryptography（AES 加密）
+**后端**：Flask 3.0 · SQLAlchemy · PyMySQL（MySQL 驱动）· Flask-CORS · Requests · Cryptography（AES 加密）· python-dotenv
 
 **前端**：Vue 3.4 · Vite 5 · Vue Router · Pinia · Arco Design · Axios · GSAP 3.12 · dayjs
 
 ## ⚠️ 注意事项
 
-1. **Token 有效期**：约 100 分钟，过期后需重新获取
-2. **端口占用**：确保 5000（后端）和 8080（前端）端口未被占用
-3. **网络连接**：后端需能访问图书馆服务器（http://libyy.qfnu.edu.cn）
+1. **数据库配置**：首次运行前须先建库并配置 `backend/.env`，`.env` 含密码不会提交到 Git
+2. **Token 有效期**：约 100 分钟，过期后需重新获取
+3. **端口占用**：确保 5000（后端）和 8080（前端）端口未被占用
+4. **网络连接**：后端需能访问图书馆服务器（http://libyy.qfnu.edu.cn）
 
 ## 📄 许可证
 
