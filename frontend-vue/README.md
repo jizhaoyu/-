@@ -79,12 +79,9 @@ npm run build
 npm run preview
 ```
 
-## 一键启动（Windows）
+## 一键启动
 
-双击 `启动Vue3前端.bat`，脚本会自动：
-1. 安装依赖（如果需要）
-2. 启动开发服务器
-3. 自动打开浏览器
+在项目根目录双击 `启动全部服务.bat`（Windows）或运行 `启动全部服务.sh`（macOS/Linux），脚本会自动启动后端 Flask 服务并安装前端依赖、启动 Vite 开发服务器。
 
 ## 核心功能
 

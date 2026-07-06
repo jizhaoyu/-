@@ -39,8 +39,7 @@ QFNULibraryBook-main/
 │   └── vite.config.ts             # Vite 配置（端口 8080，/api 代理到 5000）
 ├── json/seat_info/                # 座位信息数据
 ├── assets/                        # 资源文件
-├── 启动后端服务.bat / .sh          # 后端启动脚本
-├── 启动Vue3前端.bat / .sh          # 前端启动脚本
+├── 启动全部服务.bat / .sh          # 一键启动后端 + Vue3 前端
 ├── 快速启动指南.md                 # 快速上手文档
 ├── 项目结构说明.md                 # 结构与开发说明
 └── API文档.md                      # 接口文档
@@ -54,34 +53,31 @@ QFNULibraryBook-main/
 - **Node.js**: 16+（含 npm）
 - **浏览器**: Chrome/Edge/Firefox 最新版
 
-### 1️⃣ 启动后端服务
+### 1️⃣ 一键启动全部服务
 
-双击 `启动后端服务.bat`（或运行 `启动后端服务.sh`），脚本会自动创建虚拟环境、安装依赖、初始化数据库并启动 Flask 服务（http://127.0.0.1:5000）。
+双击 `启动全部服务.bat`（Windows）或运行 `启动全部服务.sh`（macOS/Linux），脚本会自动：
 
-手动启动：
+- 创建后端虚拟环境、安装 Python 依赖、初始化数据库并在新窗口启动 Flask 服务（http://127.0.0.1:5000）
+- 安装前端 npm 依赖并启动 Vite 开发服务器（http://127.0.0.1:8080）
+
+手动启动（可选）：
 
 ```bash
+# 后端
 cd backend
 python -m venv .venv
 .venv\Scripts\activate       # Windows
 # source .venv/bin/activate  # macOS/Linux
 pip install -r requirements.txt
 python app.py
-```
 
-### 2️⃣ 启动前端界面
-
-双击 `启动Vue3前端.bat`（或运行 `启动Vue3前端.sh`），脚本会自动安装依赖并启动 Vite 开发服务器（http://127.0.0.1:8080）。
-
-手动启动：
-
-```bash
+# 前端（另开一个终端）
 cd frontend-vue
 npm install
 npm run dev
 ```
 
-### 3️⃣ 打开浏览器
+### 2️⃣ 打开浏览器
 
 访问 http://127.0.0.1:8080 即可使用系统。前端通过 Vite 的 `/api` 代理访问后端，无需额外配置跨域。
 
